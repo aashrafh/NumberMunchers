@@ -41,7 +41,7 @@ VERTICAL_LINE MACRO COLOR, COL
 	BACK:
 		INT 10H
 		INC DX
-		CMP DX, 160
+		CMP DX, 159
 		JNZ BACK
 	
 ENDM VERTICAL_LINE
@@ -129,3 +129,32 @@ DATA_ROW MACRO
 		CMP CH, 0
 		JNZ DISPLAY_INNER
 ENDM DATA_ROW
+
+CLEAR MACRO COLOR, X, Y, WIDTH, HIGHT
+	LOCAL outerloopclear, innerloopclear
+	 mov  bh , 0   ;DisplayPage doesn't change	 
+     mov  Dx , Y ;start Y for player1
+	
+	
+	 mov  DI , X; limit for x
+	 add  DI , WIDTH 
+	 sub  DI , 1
+	 
+     mov  BX , Y	 ; limit for y
+     add  BX , HIGHT
+     Sub  BX , 1
+outerloopclear:
+       mov cx , X ;start x for player1
+	   
+	innerloopclear:	 
+			mov al , COLOR ;color for this cell
+			mov ah ,0ch ;Draw command
+			int 10h     ;int fo Draw pixel
+			inc cx
+			cmp cx ,DI ;the end X for Ball
+			jbe innerloopclear
+			
+        inc dx
+        cmp dx  ,BX ; the end Y for player1
+        jbe  outerloopclear
+EndM CLEAR

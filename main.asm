@@ -33,6 +33,8 @@
 	
 	PLAYER_ONE_X DW  5			;X position of the first player
 	PLAYER_ONE_Y DW 131		;Y position of the first player
+	OLD_X DW  5			;X position of the first player
+	OLD_Y DW 131		;Y position of the first player
 	LINE_COLOR DB 5
 	BGC EQU 0 ;Light Cyan
 	NUMS DW 50 DUP(0)
@@ -66,7 +68,7 @@
 			 CALL INITIALIZE_SCREEN
 			 
 	CHECK_TIME:
-
+			CALL INITIALIZE_SCREEN
 			MOV AH,2Ch ;get the system time
 			INT 21h    ;CH = hour CL = minute DH = second DL = 1/100 seconds
 			
@@ -112,8 +114,9 @@
 				JNZ DISPLAY_OUTER
 				
 			; Draw Players 
+			; CLEAR 00, OLD_X, OLD_Y, PLAYER_WIDTH, PLAYER_HIGHT
 			DRAW PLAYER1, PLAYER_ONE_X, PLAYER_ONE_Y, PLAYER_WIDTH, PLAYER_HIGHT 
-			
+			CALL MOVEPLAYER
 		JMP CHECK_TIME ;AFTER EVERYTHING CHECKS TIME AGAIN
 			
 		;return the control to the dos
@@ -159,6 +162,56 @@
 		RET
 		
 	RANDOM_NUMBER ENDP
+	
+	MOVEPLAYER PROC NEAR 
+	
+		;READ CHARACTER FROM KEYBOARD
+		MOV AH,0
+		INT 16H
+		JZ DONE
+
+		CMP AL, 115
+		JZ DOWN
+		;UP
+		CMP AL, 119
+		JZ UP
+		;LEFT
+		CMP AL, 097
+		JZ LEFT
+		;RIGHT
+		CMP AL, 100
+		JZ RIGHT
+		
+		JMP DEFAULT
+		
+		RIGHT:
+			; MOV AX, PLAYER_ONE_X
+			; MOV OLD_X, AX
+			ADD PLAYER_ONE_X, 40
+			JMP DONE
+		LEFT:
+			; MOV AX, PLAYER_ONE_X
+			; MOV OLD_X, AX
+			SUB PLAYER_ONE_X, 40
+			JMP DONE
+		UP:
+			; MOV AX, PLAYER_ONE_Y
+			; MOV OLD_Y, AX
+			SUB PLAYER_ONE_Y, 29
+			JMP DONE
+		DOWN:
+			; MOV AX, PLAYER_ONE_Y
+			; MOV OLD_Y, AX
+			ADD PLAYER_ONE_Y, 29
+			JMP DONE
+		DEFAULT: 
+			JMP DONE
+		
+		
+		DONE:
+			RET
+			
+	MOVEPLAYER ENDP
 	
 	END MAIN 
 		
