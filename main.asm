@@ -37,9 +37,9 @@
 	OLD_Y DW 131		;Y position of the first player
 	LINE_COLOR DB 5
 	BGC EQU 0 ;Light Cyan
-	NUMS DW 50 DUP(0)
-	PLAYER_POS_ROW DW 5
-	PLAYER_POS_COL DW 1
+	PLAYER_POS_ROW DB 5
+	PLAYER_POS_COL DB 1
+	ARRAY_IDX DB 0
 	TIME_AUX DB 0 ;variable used when checking if the time has changed
 	;player common attributes
 	PLAYER_X DW ?
@@ -49,7 +49,11 @@
 	PLAYER_VELOCITY_X DW 6     	;X (horizontal) velocity of the player
 	PLAYER_VELOCITY_Y DW 3    	;Y (vertical) velocity of the player
     PLAYER_OUTER_VELOCITY DW 10
-   
+	NUMBERS DB 50 DUP(0)
+	SCORE_MES DB 'Score: ', '$'
+	TIME_REM DB 'Time: ', '$'
+	WELCOME_MES DB 'CHOOSE MULTIPLE OF ', '$'
+	GAME_OVER_MES DB 'GAME OVER', '$'
 	.CODE
 	 ; __  __     _     ___   _  _ 
 	 ;|  \/  |   /_\   |_ _| | \| |
@@ -100,21 +104,28 @@
 			
 			CALL RANDOM_NUMBER
 			
-			; MOV AH, 0AH
-			; INT 10H
-			MOV SI, OFFSET NUMS
+			MOV SI, OFFSET NUMBERS
 			MOV CL, 2 ;ROW
 			MOV DH, 5
 			DISPLAY_OUTER:
 				MOV DL, 0 ;COL
 				MOV CH, 8
-				DATA_ROW
+				DISPLAY_INNER:
+					MOV AX, [SI]
+					DISPLAYNUMBER LINE_COLOR, DL, CL
+					INC SI
+					ADD DL, 5
+					DEC CH
+					CMP CH, 0
+					JNZ DISPLAY_INNER
 				ADD CL, 4
 				MOV DL, 0
 				DEC DH
 				CMP DH, 0
 				JNZ DISPLAY_OUTER
-				
+			
+			;Display Game message
+			
 			; Draw Players 
 			; CLEAR 00, OLD_X, OLD_Y, PLAYER_WIDTH, PLAYER_HIGHT
 			DRAW PLAYER1, PLAYER_ONE_X, PLAYER_ONE_Y, PLAYER_WIDTH, PLAYER_HIGHT 
@@ -144,22 +155,23 @@
 	INITIALIZE_SCREEN  ENDP
 	
 	;Linear congruential generator: https://en.wikipedia.org/wiki/Linear_congruential_generator
-	; z= (a*z+b) mod m = (31*z+13)%19683
+	; z= (a*z+b) mod m = (17*z+13)%101
 	;source: https://www.daniweb.com/programming/software-development/threads/292225/random-number-generating-in-assembly
 	RANDOM_NUMBER PROC NEAR
 	
-		MOV DX, 0ABBAH ;43962D is initial Value z for random sequence
+		MOV DX, 000AH ;11D is initial Value z for random sequence
 		MOV CX, 0032H  ;compute 0032H = 50D pseudo random numbers
-		MOV SI, OFFSET NUMS
+		MOV SI, OFFSET NUMBERS
 		RN:
 			MOV AX, DX ;set new initial value z
-			MOV BX, 001FH ;31D
-			MUL BX        ;31 * z
+			MOV BX, 0011H ;17D
+			MUL BX        ;17 * z
 			ADD AX, 000DH ;+13
-			MOV BX, 4CE3H ;19683D
-			DIV BX        ;div by 19683D
-			MOV [SI], DX
-			ADD SI, 2
+			MOV BX, 03E9H ;101D
+			DIV BX        ;div by 101D
+			; MOV DL, 0AH
+			MOV [SI], DL
+			INC SI
 			LOOP RN
 		RET
 		
@@ -231,4 +243,38 @@
 			
 	MOVEPLAYER ENDP
 	
+	SELECT_NUMBER PROC NEAR
+		MOV AH,0
+		INT 16H
+		JZ DONE_SEL
+		
+		CMP AL, 32
+		JNZ DONE_SEL
+		
+		;array index = row * 8 - 9 + col
+		MOV AL, 8
+		MOV BL, PLAYER_POS_ROW
+		MUL BL
+		SUB AL, 9
+		ADD AL, PLAYER_POS_COL
+		
+		MOV ARRAY_IDX, AL
+		
+		DONE_SEL:
+			RET
+	SELECT_NUMBER ENDP
+	
+	;Linear congruential generator
+	GET_MULTIPLE PROC NEAR
+	
+		MOV DX, 0005H ;11D is initial Value z for random sequence
+		MOV AX, DX ;set new initial value z
+		MOV BX, 0005H ;5D
+		MUL BX        ;5 * z
+		ADD AX, 0003H ;+3
+		MOV BX, 000BH ;11D
+		DIV BX        ;div by 11D
+		
+		RET
+	GET_MULTIPLE ENDP
 	END MAIN 
