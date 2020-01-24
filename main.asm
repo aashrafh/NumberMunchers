@@ -39,7 +39,7 @@
 	BGC EQU 0 ;Light Cyan
 	PLAYER_POS_ROW DB 5
 	PLAYER_POS_COL DB 1
-	ARRAY_IDX DW 0000H
+	ARRAY_IDX DW 0
 	TIME_AUX DB 0 ;variable used when checking if the time has changed
 	;player common attributes
 	PLAYER_X DW ?
@@ -50,6 +50,7 @@
 	PLAYER_VELOCITY_Y DW 3    	;Y (vertical) velocity of the player
     PLAYER_OUTER_VELOCITY DW 10
 	NUMBERS DW 50 DUP(0)
+	FLAG DW 50 DUP(0)
 	SCORE_MES DB 'Score: ', '$'
 	SCORE_NUM DW 0000H
 	TIME_REM_1 DB 'Time: ', '$'
@@ -82,6 +83,7 @@
 			INT 10H
 			CALL INITIALIZE_SCREEN
 			
+			MOV AX, SCORE_NUM
 			CALL DISPLAY_SCORE
 			;Display CHOOSE message
 			MOV  DL, 0   ;COLUMN
@@ -92,9 +94,9 @@
 			MOV AH, 9
 			MOV DX, OFFSET WELCOME_MES
 			INT 21H
+			
 			CALL GET_MULTIPLE
-			ADD MULTIPLE_NUMB, DX
-			MOV DIV_NUM, DX
+			
 			MOV AH, 9
 			MOV DX, OFFSET MULTIPLE_NUMB
 			INT 21H
@@ -182,7 +184,8 @@
 			; INT 21H
 			
 	MAIN ENDP
-		TIME_COUNTER PROC NEAR
+	
+	TIME_COUNTER PROC NEAR
 		MOV AH,2Ch ;get the system time
 		INT 21h    ;CH = hour CL = minute DH = second DL = 1/100 seconds
 		
@@ -294,13 +297,25 @@
 			
 			MOV AH, 00H
 			MOV ARRAY_IDX, AX
-			MOV BX, OFFSET NUMBERS
-			MOV AX, [BX+ARRAY_IDX]
+			
+			;Check for repeated choice
+			MOV SI, OFFSET FLAG
+			ADD SI, ARRAY_IDX
+			ADD SI, ARRAY_IDX
+			MOV AX, 1
+			CMP [SI], AX
+			JZ DONE
+			MOV [SI], AX
+			
+			MOV SI, OFFSET NUMBERS
+			ADD SI, ARRAY_IDX
+			ADD SI, ARRAY_IDX
+			MOV AX, [SI]
 			MOV DX, 0000H
 			MOV BX, DIV_NUM
 			DIV BX
 			CMP DX, 0000H
-			JNE DONE
+			JNZ DONE
 			ADD SCORE_NUM, 5
 			MOV AX, SCORE_NUM
 			CALL DISPLAY_SCORE
@@ -327,10 +342,10 @@
 	
 	;Linear congruential generator
 	GET_MULTIPLE PROC NEAR
+		PUSHA
 		MOV AH,2Ch ;get the system time
 		INT 21h    ;CH = hour CL = minute DH = second DL = 1/100 seconds
 		
-		MOV DL, DH
 		MOV DH, 00H
 		MOV AX, DX ;set new initial value z
 		MOV BX, 0005H ;5D
@@ -338,7 +353,9 @@
 		ADD AX, 0003H ;+3
 		MOV BX, 000BH ;11D
 		DIV BX        ;div by 11D
-		
+		MOV DIV_NUM, DX
+		ADD MULTIPLE_NUMB, DX
+		POPA
 		RET
 	GET_MULTIPLE ENDP
 	
@@ -374,7 +391,7 @@
 	DISPLAY_TIME ENDP
 	
 	DISPLAY_SCORE PROC NEAR
-		PUSH AX
+		PUSHA
 		;Display score 
 		MOV  DL, 0   ;COLUMN
 		MOV  DH, 0   ;ROW
@@ -385,7 +402,7 @@
 		MOV DX, OFFSET SCORE_MES
 		INT 21H
 		
-		POP AX
+		POPA
 		;Display A3
 		MOV CX, 1000D
 		MOV DX, 0
