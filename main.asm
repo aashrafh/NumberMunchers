@@ -35,7 +35,7 @@
 	PLAYER_ONE_Y DW 131		;Y position of the first player
 	OLD_X DW  5			;X position of the first player
 	OLD_Y DW 131		;Y position of the first player
-	LINE_COLOR DB 5
+	LINE_COLOR DB 15
 	BGC EQU 0 ;Light Cyan
 	PLAYER_POS_ROW DB 5
 	PLAYER_POS_COL DB 1
@@ -61,8 +61,10 @@
 	WELCOME_MES DB 'CHOOSE MULTIPLE OF ', '$'
 	MULTIPLE_NUMB DW '0', '$'
 	DIV_NUM DW 0
-	GAME_OVER_MES DB 'GAME OVER', '$'
+	GAME_OVER_MES DB '---------G  A  M  E O  V  E  R---------', '$'
 	OLD_TIME DB 0
+	REM_LIVE DB 'Lives: ', '$'
+	LIVE DB 3
 	.CODE
 	 ; __  __     _     ___   _  _ 
 	 ;|  \/  |   /_\   |_ _| | \| |
@@ -111,7 +113,6 @@
 			MOV TIME_REM_NUMB_END, DH
 				
 			CALL RANDOM_NUMBER
-			 
 		CHECK_TIME:
 			CALL INITIALIZE_SCREEN
 			MOV AH,2Ch ;get the system time
@@ -124,7 +125,24 @@
 			MOV TIME_AUX,DL ;update time
 			CALL TIME_COUNTER
 			
+			;Display lives
+			CMP LIVE, 0
+			JZ GAME_OVER
+			MOV  DL, 0   ;COLUMN
+			MOV  DH, 22   ;ROW
+			MOV  BH, 0    ;DISPLAY PAGE
+			MOV  AH, 02H  ;SETCURSORPOSITION
+			INT  10H
+			MOV AH, 9
+			MOV DX, OFFSET REM_LIVE
+			INT 21H
+			MOV DL, LIVE
+			ADD DL, 48D
+			DISPLAY 4
+		
 			CONT:
+			CMP TIME_REM_2, 0
+			JZ GAME_OVER
 			;Draw vertical line
 			MOV BX, 32
 			MOV DI, 7
@@ -151,7 +169,7 @@
 				MOV CH, 8
 				DISPLAY_INNER:
 					MOV AX, [SI]
-					DISPLAYNUMBER LINE_COLOR, DL, CL
+					DISPLAYNUMBER 5, DL, CL
 					ADD SI, 2
 					ADD DL, 5
 					DEC CH
@@ -171,17 +189,18 @@
 		
 		GAME_OVER:
 			MOV  DL, 0   ;COLUMN
-			MOV  DH, 22   ;ROW
+			MOV  DH, 14   ;ROW
 			MOV  BH, 0    ;DISPLAY PAGE
 			MOV  AH, 02H  ;SETCURSORPOSITION
 			INT  10H
 			MOV AH, 9
 			MOV DX, OFFSET GAME_OVER_MES
 			INT 21H
-		;return the control to the dos
-		; control_dos:	
-			; MOV AH, 4CH
-			; INT 21H
+			MOV AH, 4CH
+			INT 21H
+			; CALL INITIALIZE_SCREEN
+		
+		HLT
 			
 	MAIN ENDP
 	
@@ -193,9 +212,8 @@
 		JE CONT
 		MOV OLD_TIME, DH
 		SUB TIME_REM_2, 1
-		CMP TIME_REM_2, 0
-		JE GAME_OVER
 		CALL DISPLAY_TIME
+		RET
 	TIME_COUNTER ENDP
 	
 	INITIALIZE_SCREEN PROC NEAR
@@ -315,13 +333,15 @@
 			MOV BX, DIV_NUM
 			DIV BX
 			CMP DX, 0000H
-			JNZ DONE
+			JNZ BEF_DONE
 			ADD SCORE_NUM, 5
 			MOV AX, SCORE_NUM
 			CALL DISPLAY_SCORE
 		DEFAULT: 
 			JMP DONE
-		
+		BEF_DONE:
+			DEC LIVE
+			JMP DONE
 		RIGHT_BOUND:
 			MOV PLAYER_POS_COL, 8
 			JMP DONE
