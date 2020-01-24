@@ -1,6 +1,6 @@
 <p align="center">
   <a href="" rel="noopener">
- <img width=400px height=210px src="https://github.com/aashrafh/BlobbyVolley/blob/master/demo/logo.png" alt="BlobbyVolley logo"></a>
+ <img width=400px height=210px src="https://github.com/aashrafh/NumberMunchers/blob/master/demo/logo.png" alt="NumberMunchers logo"></a>
 </p>
 
 <p align="center">
