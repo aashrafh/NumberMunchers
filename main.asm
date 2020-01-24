@@ -39,7 +39,7 @@
 	BGC EQU 0 ;Light Cyan
 	PLAYER_POS_ROW DB 5
 	PLAYER_POS_COL DB 1
-	ARRAY_IDX DB 0
+	ARRAY_IDX DW 0000H
 	TIME_AUX DB 0 ;variable used when checking if the time has changed
 	;player common attributes
 	PLAYER_X DW ?
@@ -49,11 +49,19 @@
 	PLAYER_VELOCITY_X DW 6     	;X (horizontal) velocity of the player
 	PLAYER_VELOCITY_Y DW 3    	;Y (vertical) velocity of the player
     PLAYER_OUTER_VELOCITY DW 10
-	NUMBERS DB 50 DUP(0)
+	NUMBERS DW 50 DUP(0)
 	SCORE_MES DB 'Score: ', '$'
-	TIME_REM DB 'Time: ', '$'
+	SCORE_NUM DW 0000H
+	TIME_REM_1 DB 'Time: ', '$'
+	TIME_REM_2 DB 60
+	TIME_REM_3 DB ' seconds', '$'
+	TIME_REM_NUMB_START DB 0
+	TIME_REM_NUMB_END DB 0
 	WELCOME_MES DB 'CHOOSE MULTIPLE OF ', '$'
+	MULTIPLE_NUMB DW '0', '$'
+	DIV_NUM DW 0
 	GAME_OVER_MES DB 'GAME OVER', '$'
+	OLD_TIME DB 0
 	.CODE
 	 ; __  __     _     ___   _  _ 
 	 ;|  \/  |   /_\   |_ _| | \| |
@@ -61,19 +69,48 @@
 	 ;|_|  |_| /_/ \_\ |___| |_|\_|
 								  
 	;MAIN MENUE
+	
 	MAIN PROC FAR
 
-			mov AX, @DATA
-			mov DS, AX	
-			mov es,ax 
+		MOV AX, @DATA
+		MOV DS, AX	
+		MOV ES,AX 
 			
-		start_game:
-			 Mov ah , 00h  ;change to vedio mode
-			 Mov Al , 13h
-			 int 10h
-			 CALL INITIALIZE_SCREEN
+		START_GAME:
+			MOV AH , 00H  ;CHANGE TO VEDIO MODE
+			MOV AL , 13H
+			INT 10H
+			CALL INITIALIZE_SCREEN
+			
+			CALL DISPLAY_SCORE
+			;Display CHOOSE message
+			MOV  DL, 0   ;COLUMN
+			MOV  DH, 20   ;ROW
+			MOV  BH, 0    ;DISPLAY PAGE
+			MOV  AH, 02H  ;SETCURSORPOSITION
+			INT  10H
+			MOV AH, 9
+			MOV DX, OFFSET WELCOME_MES
+			INT 21H
+			CALL GET_MULTIPLE
+			ADD MULTIPLE_NUMB, DX
+			MOV DIV_NUM, DX
+			MOV AH, 9
+			MOV DX, OFFSET MULTIPLE_NUMB
+			INT 21H
+			
+			;Display time remaining
+			CALL DISPLAY_TIME
+			
+			MOV AH,2Ch ;get the system time
+			INT 21h    ;CH = hour CL = minute DH = second DL = 1/100 seconds
+			MOV TIME_REM_NUMB_START, DH
+			ADD DH, 60
+			MOV TIME_REM_NUMB_END, DH
+				
+			CALL RANDOM_NUMBER
 			 
-	CHECK_TIME:
+		CHECK_TIME:
 			CALL INITIALIZE_SCREEN
 			MOV AH,2Ch ;get the system time
 			INT 21h    ;CH = hour CL = minute DH = second DL = 1/100 seconds
@@ -83,7 +120,9 @@
 							 ;if it's different, then draw, move, etc.
 			
 			MOV TIME_AUX,DL ;update time
+			CALL TIME_COUNTER
 			
+			CONT:
 			;Draw vertical line
 			MOV BX, 32
 			MOV DI, 7
@@ -102,8 +141,6 @@
 				DEC DI
 				JNZ DRAW_HORIZONTAL_LINES
 			
-			CALL RANDOM_NUMBER
-			
 			MOV SI, OFFSET NUMBERS
 			MOV CL, 2 ;ROW
 			MOV DH, 5
@@ -113,7 +150,7 @@
 				DISPLAY_INNER:
 					MOV AX, [SI]
 					DISPLAYNUMBER LINE_COLOR, DL, CL
-					INC SI
+					ADD SI, 2
 					ADD DL, 5
 					DEC CH
 					CMP CH, 0
@@ -124,20 +161,39 @@
 				CMP DH, 0
 				JNZ DISPLAY_OUTER
 			
-			;Display Game message
-			
 			; Draw Players 
 			; CLEAR 00, OLD_X, OLD_Y, PLAYER_WIDTH, PLAYER_HIGHT
 			DRAW PLAYER1, PLAYER_ONE_X, PLAYER_ONE_Y, PLAYER_WIDTH, PLAYER_HIGHT 
 			CALL MOVEPLAYER
 		JMP CHECK_TIME ;AFTER EVERYTHING CHECKS TIME AGAIN
-			
+		
+		GAME_OVER:
+			MOV  DL, 0   ;COLUMN
+			MOV  DH, 22   ;ROW
+			MOV  BH, 0    ;DISPLAY PAGE
+			MOV  AH, 02H  ;SETCURSORPOSITION
+			INT  10H
+			MOV AH, 9
+			MOV DX, OFFSET GAME_OVER_MES
+			INT 21H
 		;return the control to the dos
 		; control_dos:	
 			; MOV AH, 4CH
 			; INT 21H
 			
 	MAIN ENDP
+		TIME_COUNTER PROC NEAR
+		MOV AH,2Ch ;get the system time
+		INT 21h    ;CH = hour CL = minute DH = second DL = 1/100 seconds
+		
+		CMP DH, OLD_TIME
+		JE CONT
+		MOV OLD_TIME, DH
+		SUB TIME_REM_2, 1
+		CMP TIME_REM_2, 0
+		JE GAME_OVER
+		CALL DISPLAY_TIME
+	TIME_COUNTER ENDP
 	
 	INITIALIZE_SCREEN PROC NEAR
 	
@@ -156,10 +212,12 @@
 	
 	;Linear congruential generator: https://en.wikipedia.org/wiki/Linear_congruential_generator
 	; z= (a*z+b) mod m = (17*z+13)%101
-	;source: https://www.daniweb.com/programming/software-development/threads/292225/random-number-generating-in-assembly
+	;source(I modified some of it): https://www.daniweb.com/programming/software-development/threads/292225/random-number-generating-in-assembly
 	RANDOM_NUMBER PROC NEAR
-	
-		MOV DX, 000AH ;11D is initial Value z for random sequence
+		MOV AH,2Ch ;get the system time
+		INT 21h    ;CH = hour CL = minute DH = second DL = 1/100 seconds
+		
+		MOV DL, 0AH
 		MOV CX, 0032H  ;compute 0032H = 50D pseudo random numbers
 		MOV SI, OFFSET NUMBERS
 		RN:
@@ -170,19 +228,20 @@
 			MOV BX, 03E9H ;101D
 			DIV BX        ;div by 101D
 			; MOV DL, 0AH
-			MOV [SI], DL
-			INC SI
+			; MOV DH, 00
+			MOV [SI], DX
+			ADD SI, 2
 			LOOP RN
 		RET
 		
 	RANDOM_NUMBER ENDP
 	
 	MOVEPLAYER PROC NEAR 
-	
+	;{
 		;READ CHARACTER FROM KEYBOARD
 		MOV AH,0
 		INT 16H
-		JZ DONE
+		; JZ DONE
 
 		CMP AL, 115
 		JZ DOWN
@@ -195,6 +254,9 @@
 		;RIGHT
 		CMP AL, 100
 		JZ RIGHT
+		
+		CMP AL, 118
+		JZ INC_SCORE
 		
 		JMP DEFAULT
 		
@@ -222,6 +284,26 @@
 			JZ  DOWN_BOUND
 			ADD PLAYER_ONE_Y, 29
 			JMP DONE
+		INC_SCORE:
+			;array index = row * 8 - 9 + col
+			MOV AL, 8
+			MOV BL, PLAYER_POS_ROW
+			MUL BL
+			SUB AL, 9
+			ADD AL, PLAYER_POS_COL
+			
+			MOV AH, 00H
+			MOV ARRAY_IDX, AX
+			MOV BX, OFFSET NUMBERS
+			MOV AX, [BX+ARRAY_IDX]
+			MOV DX, 0000H
+			MOV BX, DIV_NUM
+			DIV BX
+			CMP DX, 0000H
+			JNE DONE
+			ADD SCORE_NUM, 5
+			MOV AX, SCORE_NUM
+			CALL DISPLAY_SCORE
 		DEFAULT: 
 			JMP DONE
 		
@@ -240,34 +322,16 @@
 			
 		DONE:
 			RET
-			
+	;}		
 	MOVEPLAYER ENDP
-	
-	SELECT_NUMBER PROC NEAR
-		MOV AH,0
-		INT 16H
-		JZ DONE_SEL
-		
-		CMP AL, 32
-		JNZ DONE_SEL
-		
-		;array index = row * 8 - 9 + col
-		MOV AL, 8
-		MOV BL, PLAYER_POS_ROW
-		MUL BL
-		SUB AL, 9
-		ADD AL, PLAYER_POS_COL
-		
-		MOV ARRAY_IDX, AL
-		
-		DONE_SEL:
-			RET
-	SELECT_NUMBER ENDP
 	
 	;Linear congruential generator
 	GET_MULTIPLE PROC NEAR
-	
-		MOV DX, 0005H ;11D is initial Value z for random sequence
+		MOV AH,2Ch ;get the system time
+		INT 21h    ;CH = hour CL = minute DH = second DL = 1/100 seconds
+		
+		MOV DL, DH
+		MOV DH, 00H
 		MOV AX, DX ;set new initial value z
 		MOV BX, 0005H ;5D
 		MUL BX        ;5 * z
@@ -277,4 +341,85 @@
 		
 		RET
 	GET_MULTIPLE ENDP
+	
+	DISPLAY_TIME PROC NEAR
+		MOV  DL, 0   ;COLUMN
+		MOV  DH, 21   ;ROW
+		MOV  BH, 0    ;DISPLAY PAGE
+		MOV  AH, 02H  ;SETCURSORPOSITION
+		INT  10H
+		MOV AH, 9
+		
+		MOV DX, OFFSET TIME_REM_1
+		INT 21H
+		
+		MOV AL, TIME_REM_2
+		MOV AH, 00H
+		MOV CX, 10D
+		DIV Cl		;AL = AX / CX 
+		MOV CH, AH	;Reminder
+		MOV DL, AL
+		ADD DL, 48D
+		DISPLAY 4
+
+		;Display A0
+		MOV DL, CH
+		ADD DL, 48D
+		DISPLAY 4
+		
+		MOV AH, 9
+		MOV DX, OFFSET TIME_REM_3
+		INT 21H
+		RET
+	DISPLAY_TIME ENDP
+	
+	DISPLAY_SCORE PROC NEAR
+		PUSH AX
+		;Display score 
+		MOV  DL, 0   ;COLUMN
+		MOV  DH, 0   ;ROW
+		MOV  BH, 0    ;DISPLAY PAGE
+		MOV  AH, 02H  ;SETCURSORPOSITION
+		INT  10H
+		MOV AH, 9
+		MOV DX, OFFSET SCORE_MES
+		INT 21H
+		
+		POP AX
+		;Display A3
+		MOV CX, 1000D
+		MOV DX, 0
+		DIV CX		;AX = DX:AX / CX
+		MOV CX, DX	;Reminer
+		MOV DL, AL
+		ADD DL, 48D
+		DISPLAY 4
+		
+		;Display A2
+		MOV AX, CX	;AX has reminder
+		MOV CX, 100D
+		MOV DX, 0
+		DIV CX		;AX = DX:AX / CX
+		MOV CX, DX	;reminder
+		MOV	DL, AL
+		ADD DL, 48D
+		DISPLAY 4
+
+		;Display A1
+		MOV AX, CX
+		MOV CX, 10D
+		DIV Cl		;AL = AX / CX 
+		MOV CH, AH	;Reminder
+		MOV DL, AL
+		ADD DL, 48D
+		DISPLAY 4
+
+		;Display A0
+		MOV DL, CH
+		ADD DL, 48D
+		DISPLAY 4
+		RET
+	DISPLAY_SCORE ENDP
+	
 	END MAIN 
+	
