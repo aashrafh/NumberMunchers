@@ -76,7 +76,7 @@ You have to choice all the correct numbers. To move the player you can use:
 * ```S``` to move ```DOWN```
 * ```A``` to move ```LEFT```
 * ```D``` to move ```RIGHT```
-*```V``` to choice a number
+* ```V``` to choice a number
 
 ## ⛏️ Built Using <a name = "tech"></a>
 - [Assembly8086](https://en.wikipedia.org/wiki/X86_assembly_language) - low level programming language.
